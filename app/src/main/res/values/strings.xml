@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">ParkSysPhone</string>
+<!-- Preference keys -->
+    <string name="prefs_refresh_token">refresh_token</string>
+    <string name="prefs_access_token">access_token</string>
+    <string name="prefs_server_host">server_host</string>
+    <string name="prefs_server_port">server_port</string>
+<!-- TODO: HTTPS -->
+    <string name="prefs_server_protocol">server_protocol</string>
 </resources>

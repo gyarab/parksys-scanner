@@ -1,6 +1,7 @@
 package cz.tmscer.parksys.phone
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.AsyncTask
@@ -29,7 +30,32 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        setDefaultPreferences()
         captureActivation.setOnClickListener(captureQrActivationPassword)
+    }
+
+    private fun setDefaultPreferences(force: Boolean = false) {
+        val defaults = mapOf(
+            R.string.prefs_server_port to 8080,
+            R.string.prefs_server_host to "192.168.1.48",
+            R.string.prefs_server_protocol to "http"
+        )
+        val prefs = getPreferences(Context.MODE_PRIVATE)
+        with (prefs.edit()) {
+            for ((keyI, value) in defaults) {
+                val key = getString(keyI)
+                if (force || !prefs.contains(key)) {
+                    when (value) {
+                        is Int -> putInt(key, value)
+                        is String -> putString(key, value)
+                        is Float -> putFloat(key, value)
+                        is Long -> putLong(key, value)
+                        is Boolean -> putBoolean(key, value)
+                    }
+                }
+            }
+            commit()
+        }
     }
 
     // Taken from https://stackoverflow.com/questions/8830647/how-to-scan-qrcode-in-android/8830801
@@ -72,10 +98,28 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
             JsonObjectRequest(Request.Method.POST, "http://192.168.1.48:8080/devices/activate",
                 body,
                 Response.Listener<JSONObject> { response ->
-                    // TODO: Save the accessToken and the activationPassword
                     println(response)
+                    if (!response.has("data")) return@Listener
+                    val data = response.getJSONObject("data")
+                    if (data.has("accessToken") && data.has("refreshToken")) {
+                        val accessT = data.getString("accessToken")
+                        val refreshT = data.getString("refreshToken")
+                        val prefs = getPreferences(Context.MODE_PRIVATE)
+                        with (prefs.edit()) {
+                            putString(getString(R.string.prefs_refresh_token), refreshT)
+                            putString(getString(R.string.prefs_access_token), accessT)
+                            textAccessToken.text = accessT
+                            textRefreshToken.text = refreshT
+                            commit()
+                        }
+                    } else {
+                        // Error
+                    }
                 },
-                Response.ErrorListener { error -> println(error) }
+                Response.ErrorListener { error ->
+                    println(error)
+                    println(error.networkResponse.data)
+                }
             )
         queue.add(request)
     }
