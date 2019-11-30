@@ -62,11 +62,13 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
             }.start()
         }
         // Save file
+        // https://developer.android.com/training/data-storage/app-specific
         val fname = "capture_" + System.currentTimeMillis()
         val file = File(this.filesDir, fname)
         file.writeBytes(data)
 
         // Upload
+        // https://github.com/DWorkS/VolleyPlus
         val uploadRequest = SimpleMultiPartRequest(Request.Method.POST, backendUrl() + "/capture",
             Response.Listener { response ->
                 println(response)
