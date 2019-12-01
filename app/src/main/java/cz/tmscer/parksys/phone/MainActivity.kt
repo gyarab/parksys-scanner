@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.preference.PreferenceManager
 import com.android.volley.Request
 import com.android.volley.Response
 import com.android.volley.request.JsonObjectRequest
@@ -36,60 +37,13 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
 
     private var captureOn = false
     private val CAMERA_PERMISSION_REQUEST = 0
-    private var camera: Camera? = null
-
-    private fun take() {
-        setupCamera()
-        if (camera != null) {
-            camera!!.setPreviewTexture(SurfaceTexture(0))
-            camera!!.startPreview()
-            camera!!.takePicture(null, null, jpgCallback)
-        }
-    }
-
-    var jpgCallback = Camera.PictureCallback { data, camera ->
-        Log.d("CAMERA", "onPictureTaken - jpg")
-        if (captureOn) {
-            // Take the next picture
-            object : CountDownTimer(1000, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    println("TICK")
-                }
-
-                override fun onFinish() {
-                    take()
-                }
-            }.start()
-        }
-        // Save file
-        // https://developer.android.com/training/data-storage/app-specific
-        val fname = "capture_" + System.currentTimeMillis()
-        val file = File(this.filesDir, fname)
-        file.writeBytes(data)
-
-        // Upload
-        // https://github.com/DWorkS/VolleyPlus
-        val uploadRequest = SimpleMultiPartRequest(Request.Method.POST, backendUrl() + "/capture",
-            Response.Listener { response ->
-                println(response)
-                // TODO: Update local config
-            },
-            Response.ErrorListener { error ->
-                println(error)
-                println(error.networkResponse.data)
-            })
-        val h = getPreferences(Context.MODE_PRIVATE).getString(
-            getString(R.string.prefs_access_token), "NOTOKEN"
-        )
-        println(h)
-        uploadRequest.headers = mapOf("Authentication" to "Bearer $h")
-        uploadRequest.addFile(fname, file.absolutePath)
-        API.getInstance(this).addToRequestQueue(uploadRequest)
-    }
+    private var capture: Capture? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        capture = Capture(this, prefs)
 
         setDefaultPreferences()
         captureActivation.setOnClickListener(captureQrActivationPassword)
@@ -98,43 +52,31 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         btnPerms.setOnClickListener(getPermissions)
 
         btnToggleCapture.setOnClickListener(toggleCapture)
-        btnOneCapture.setOnClickListener(singleCapture)
+        btnOneCapture.setOnClickListener { capture!!.capturePicture() }
+
+        textAccessToken.text =
+            prefs.getString(getString(R.string.prefs_access_token), "<NO ACCESS TOKEN>")
+        textRefreshToken.text = prefs.getString(
+            getString(R.string.prefs_refresh_token),
+            "<NO REFRESH TOKEN>"
+        )
     }
 
     private val toggleCapture = View.OnClickListener {
         captureOn = !captureOn
         if (captureOn) {
             btnToggleCapture.text = getString(R.string.capture_set_off)
-            take()
+            capture!!.continuousCaptureOn()
         } else {
             btnToggleCapture.text = getString(R.string.capture_set_on)
+            capture!!.continuousCaptureOff()
         }
-    }
-
-    private val singleCapture = View.OnClickListener {
-        take()
-    }
-
-    private fun setupCamera() {
-        if (camera != null) return
-        camera = getCameraInstance()
-    }
-
-    private fun getCameraInstance(): Camera {
-        var camera: Camera? = null
-        try {
-            camera = Camera.open()
-        } catch (e: java.lang.Exception) {
-            println("CAM FAILED")
-            // cannot get camera or does not exist
-        }
-        return camera!!
     }
 
     override fun onResume() {
         super.onResume()
         println(">>> OUTPUT PREFS")
-        for ((k, v) in getPreferences(Context.MODE_PRIVATE).all) {
+        for ((k, v) in PreferenceManager.getDefaultSharedPreferences(this).all) {
             print(k)
             print(", ")
             println(v)
@@ -154,7 +96,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
             R.string.prefs_server_host to "192.168.1.48",
             R.string.prefs_server_protocol to "http"
         )
-        val prefs = getPreferences(Context.MODE_PRIVATE)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         with(prefs.edit()) {
             for ((keyI, value) in defaults) {
                 val key = getString(keyI)
@@ -170,17 +112,6 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
             }
             commit()
         }
-    }
-
-    private fun backendUrl(): String {
-        val prefs = getPreferences(Context.MODE_PRIVATE)
-        return prefs.getString(
-            getString(R.string.prefs_server_protocol),
-            "https"
-        ) + "://" + prefs.getString(getString(R.string.prefs_server_host), "") + ":" + prefs.getInt(
-            getString(R.string.prefs_server_port),
-            80
-        )
     }
 
     private val getPermissions = View.OnClickListener {
@@ -279,7 +210,11 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         val body = JSONObject()
         body.put("activationPassword", output!!.password)
         val request =
-            JsonObjectRequest(Request.Method.POST, backendUrl() + "/devices/activate",
+            JsonObjectRequest(Request.Method.POST,
+                Helpers.backendUrl(
+                    this,
+                    PreferenceManager.getDefaultSharedPreferences(this)
+                ) + "/devices/activate",
                 body,
                 Response.Listener<JSONObject> { response ->
                     println(response)
@@ -288,7 +223,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
                     if (data.has("accessToken") && data.has("refreshToken")) {
                         val accessT = data.getString("accessToken")
                         val refreshT = data.getString("refreshToken")
-                        val prefs = getPreferences(Context.MODE_PRIVATE)
+                        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
                         with(prefs.edit()) {
                             putString(getString(R.string.prefs_refresh_token), refreshT)
                             putString(getString(R.string.prefs_access_token), accessT)
