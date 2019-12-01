@@ -72,10 +72,17 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         val uploadRequest = SimpleMultiPartRequest(Request.Method.POST, backendUrl() + "/capture",
             Response.Listener { response ->
                 println(response)
+                // TODO: Update local config
             },
             Response.ErrorListener { error ->
                 println(error)
+                println(error.networkResponse.data)
             })
+        val h = getPreferences(Context.MODE_PRIVATE).getString(
+            getString(R.string.prefs_access_token), "NOTOKEN"
+        )
+        println(h)
+        uploadRequest.headers = mapOf("Authentication" to "Bearer $h")
         uploadRequest.addFile(fname, file.absolutePath)
         API.getInstance(this).addToRequestQueue(uploadRequest)
     }
