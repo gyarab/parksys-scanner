@@ -66,7 +66,7 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
         val h = preferences.getString(
             context.getString(R.string.prefs_access_token), "NOTOKEN"
         )
-        uploadRequest.headers = mapOf("Authentication" to "Bearer $h")
+        uploadRequest.headers = mapOf("Authorization" to "Bearer $h")
         uploadRequest.addFile(fileName, file.absolutePath)
         API.getInstance(context).addToRequestQueue(uploadRequest)
     }
