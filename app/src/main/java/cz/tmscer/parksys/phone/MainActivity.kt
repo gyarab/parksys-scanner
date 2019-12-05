@@ -92,9 +92,10 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
 
     private fun setDefaultPreferences(force: Boolean = false) {
         val defaults = mapOf(
-            R.string.prefs_server_port to 8080,
+            R.string.prefs_server_port to "8080",
             R.string.prefs_server_host to "192.168.1.48",
-            R.string.prefs_server_protocol to "http"
+            R.string.prefs_server_protocol to "http",
+            R.string.app_name to 1
         )
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         with(prefs.edit()) {
