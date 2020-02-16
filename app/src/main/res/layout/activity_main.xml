@@ -88,4 +88,16 @@
         app:layout_constraintStart_toEndOf="@+id/btnToggleCapture"
         app:layout_constraintTop_toBottomOf="@+id/captureActivation" />
 
+    <Button
+        android:id="@+id/askConfig"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="132dp"
+        android:text="Ask Config"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.033"
+        app:layout_constraintStart_toEndOf="@+id/btnOneCapture"
+        app:layout_constraintTop_toTopOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

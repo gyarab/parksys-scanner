@@ -40,4 +40,18 @@
 
     </PreferenceCategory>
 
+
+    <PreferenceCategory app:title="@string/server_header">
+
+        <EditTextPreference
+            android:key="shared_config_type"
+            android:title="@string/shared_config_type"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="shared_config_capturing"
+            android:title="@string/shared_config_capturing"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

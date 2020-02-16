@@ -16,4 +16,9 @@
     <string name="server_host">Host</string>
     <string name="server_port">Port</string>
     <string name="server_protocol">Protocol</string>
+
+    <string name="shared_config_header">Config Shared With Backend</string>
+    <string name="prefs_config_prefix">shared_config_</string>
+    <string name="shared_config_type">Device Type (IN/OUT)</string>
+    <string name="shared_config_capturing">Capturing (true/false)</string>
 </resources>

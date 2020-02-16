@@ -2,18 +2,14 @@ package cz.tmscer.parksys.phone
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.SurfaceTexture
-import android.hardware.Camera
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.telephony.MbmsDownloadSession.RESULT_CANCELLED
-import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -22,13 +18,11 @@ import androidx.preference.PreferenceManager
 import com.android.volley.Request
 import com.android.volley.Response
 import com.android.volley.request.JsonObjectRequest
-import com.android.volley.request.SimpleMultiPartRequest
 import com.beust.klaxon.Klaxon
 import com.beust.klaxon.KlaxonException
 import cz.tmscer.parksys.phone.models.ActivationPassword
 import kotlinx.android.synthetic.main.activity_main.*
 import org.json.JSONObject
-import java.io.File
 import java.io.StringReader
 import java.text.ParseException
 import java.util.*
@@ -53,6 +47,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
 
         btnToggleCapture.setOnClickListener(toggleCapture)
         btnOneCapture.setOnClickListener { capture!!.capturePicture() }
+        askConfig.setOnClickListener { capture!!.askForConfig() }
 
         textAccessToken.text =
             prefs.getString(getString(R.string.prefs_access_token), "<NO ACCESS TOKEN>")
@@ -62,14 +57,27 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         )
     }
 
+    override fun onPause() {
+        super.onPause()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
     private val toggleCapture = View.OnClickListener {
         captureOn = !captureOn
         if (captureOn) {
             btnToggleCapture.text = getString(R.string.capture_set_off)
             capture!!.continuousCaptureOn()
+            PreferenceManager.getDefaultSharedPreferences(this)
+                .edit()
+                .putString("shared_config_capturing", "true")
+                .commit()
         } else {
             btnToggleCapture.text = getString(R.string.capture_set_on)
             capture!!.continuousCaptureOff()
+            PreferenceManager.getDefaultSharedPreferences(this)
+                .edit()
+                .putString("shared_config_capturing", "false")
+                .commit()
         }
     }
 
@@ -83,6 +91,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         }
 
         println("<<< OUTPUT PREFS")
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private val openSettingsActivity = View.OnClickListener {
@@ -224,10 +233,16 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
                     if (data.has("accessToken") && data.has("refreshToken")) {
                         val accessT = data.getString("accessToken")
                         val refreshT = data.getString("refreshToken")
+                        val config = data.getJSONObject("device").getJSONObject("config")
                         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
                         with(prefs.edit()) {
                             putString(getString(R.string.prefs_refresh_token), refreshT)
                             putString(getString(R.string.prefs_access_token), accessT)
+                            Helpers.updateConfig(
+                                config,
+                                this,
+                                getString(R.string.prefs_config_prefix)
+                            )
                             textAccessToken.text = accessT
                             textRefreshToken.text = refreshT
                             commit()

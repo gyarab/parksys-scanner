@@ -2,6 +2,7 @@ package cz.tmscer.parksys.phone
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 object Helpers {
     fun backendUrl(context: Context, prefs: SharedPreferences): String {
@@ -15,5 +16,17 @@ object Helpers {
             context.getString(R.string.prefs_server_port),
             "80"
         )
+    }
+
+    fun shouldCapture(prefs: SharedPreferences): Boolean {
+        return prefs.getString("shared_config_capturing", "false").equals("true")
+    }
+
+    fun updateConfig(config: JSONObject, prefs: SharedPreferences.Editor, prefix: String) {
+        for (confKey in config.keys()) {
+            val value = config.getString(confKey)
+            // Prefix the config key
+            prefs.putString(String.format("%s%s", prefix, confKey), value)
+        }
     }
 }

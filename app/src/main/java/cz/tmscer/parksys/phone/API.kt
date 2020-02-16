@@ -25,6 +25,7 @@ class API constructor(context: Context) {
     }
     fun <T> addToRequestQueue(req: Request<T>) {
         println("addToRequestQueue")
+        println(req)
         requestQueue.add(req)
     }
 }
