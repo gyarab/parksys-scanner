@@ -138,6 +138,7 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                     Request.Method.POST, Helpers.backendUrl(context, preferences) + "/capture",
                     Response.Listener { response ->
                         Log.i(loggerName, "REQUEST SUCCESSFUL")
+                        file.delete()
                         println(response)
                         try {
                             updateConfig(JSONObject(response))
@@ -146,6 +147,7 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                         }
                     },
                     Response.ErrorListener { error ->
+                        file.delete()
                         Log.w(loggerName, "REQUEST FAILED")
                         println(error)
                         println(error.networkResponse.data)
