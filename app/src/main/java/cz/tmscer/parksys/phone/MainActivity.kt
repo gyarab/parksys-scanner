@@ -22,6 +22,7 @@ import com.android.volley.request.JsonObjectRequest
 import com.beust.klaxon.Klaxon
 import com.beust.klaxon.KlaxonException
 import cz.tmscer.parksys.phone.models.ActivationPassword
+import cz.tmscer.parksys.phone.models.Status
 import kotlinx.android.synthetic.main.activity_main.*
 import org.json.JSONObject
 import java.io.StringReader
@@ -35,6 +36,8 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
     private var capture: Capture? = null
     private val lastSuccessfulComm = "lastSuccessfulComm"
     private val failedComm = "failedComm"
+
+    private var status = Status.IDLE
 
     private fun isLoggedIn(prefs: SharedPreferences): Boolean {
         val rt = prefs.getString(
@@ -56,6 +59,11 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         }, onFailedComm = {
             prefs.edit().putString(failedComm, "$it (${Date()})").commit()
             updateUI()
+        }, onStatusChange = {
+            if (status != it) {
+                status = it
+                updateUI()
+            }
         })
 
         setDefaultPreferences()
@@ -116,6 +124,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         }
         textLastSuccessfulExchange.text = prefs.getString(lastSuccessfulComm, "-")
         textFailedComm.text = prefs.getString(failedComm, "-")
+        textAppStatus.text = status.toString()
     }
 
     private val openSettingsActivity = View.OnClickListener {

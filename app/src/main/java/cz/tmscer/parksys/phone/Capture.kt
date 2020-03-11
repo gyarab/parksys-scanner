@@ -13,20 +13,23 @@ import com.android.volley.Response
 import com.android.volley.error.VolleyError
 import com.android.volley.request.JsonObjectRequest
 import com.android.volley.request.SimpleMultiPartRequest
+import cz.tmscer.parksys.phone.models.Status
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.nio.charset.Charset
 
 class Capture(
     private val context: Context,
     private val preferences: SharedPreferences,
     private val onSuccessfulComm: () -> Unit,
-    private val onFailedComm: (err: String) -> Unit
+    private val onFailedComm: (err: String) -> Unit,
+    private val onStatusChange: (status: Status) -> Unit
 ) {
     private val loggerName = "CAPTURE"
     private var camera: Camera? = null
-    private var capturing = false
+    private var status = Status.IDLE
 
     private fun capture() {
         if (camera == null) {
@@ -63,13 +66,7 @@ class Capture(
     }
 
     fun askForConfig() {
-        if (!capturing) {
-            Thread {
-                Looper.prepare()
-                println("Ask for config thread")
-                askForConfig_()
-            }.start()
-        }
+        askForConfig_()
     }
 
     private fun askForConfig_() {
@@ -116,7 +113,14 @@ class Capture(
     }
 
     private fun updateConfig(json: JSONObject) {
+        if (!json.has("data")) return
         val config = json.getJSONObject("data").getJSONObject("config")
+        status = if (config.getString("capturing") == "true") {
+            Status.CAPTURING
+        } else {
+            Status.FETCHING_CONFIG
+        }
+        this.onStatusChange(status)
         with(preferences.edit()) {
             Helpers.updateConfig(config, this, "shared_config_")
             commit()
@@ -125,12 +129,16 @@ class Capture(
 
     private fun handleError(error: VolleyError) {
         Log.w(loggerName, "REQUEST FAILED")
-        println(error)
-        println(error.networkResponse.data)
-        val errorBody = if (error.networkResponse.data == null) {
-            "unreachable"
-        } else {
-            error.networkResponse.data.toString()
+        val errorBody = when {
+            error.networkResponse.data == null -> {
+                "unreachable"
+            }
+            error.networkResponse.data.isNotEmpty() -> {
+                String(error.networkResponse.data, Charset.forName("utf-8"))
+            }
+            else -> {
+                ""
+            }
         }
         val errorDescription = "${error.networkResponse.statusCode}: $errorBody"
         this.onFailedComm(errorDescription)
@@ -138,9 +146,9 @@ class Capture(
 
     private val jpgCallback = Camera.PictureCallback { data, camera ->
         Log.i(loggerName, "JPG Callback")
-        if (capturing) {
+        if (status != Status.IDLE) {
             // schedule another take
-            object : CountDownTimer(2000, 2000) {
+            object : CountDownTimer(1000, 1000) {
                 override fun onTick(millisUntilFinished: Long) {}
 
                 override fun onFinish() {
@@ -151,53 +159,67 @@ class Capture(
         // Upload
         // https://github.com/DWorkS/VolleyPlus
         val request =
-            if (Helpers.shouldCapture(preferences)) {
-                // Save the file
-                // https://developer.android.com/training/data-storage/app-specific
-                val fileName = "capture_${System.currentTimeMillis()}.jpg"
-                val file = File(context.filesDir, fileName)
-                file.writeBytes(data)
-                val upload = SimpleMultiPartRequest(
-                    Request.Method.POST, Helpers.backendUrl(context, preferences) + "/capture",
-                    Response.Listener { response ->
-                        Log.i(loggerName, "REQUEST SUCCESSFUL")
-                        this.onSuccessfulComm()
-                        file.delete()
-                        println(response)
-                        try {
-                            updateConfig(JSONObject(response))
-                        } catch (e: JSONException) {
-                            // err
-                        }
-                    },
-                    Response.ErrorListener { error ->
-                        file.delete()
-                        this.handleError(error)
-                    })
-                upload.addFile(fileName, file.absolutePath)
-            } else {
-                JsonObjectRequest(Request.Method.PUT,
-                    Helpers.backendUrl(
-                        context,
-                        PreferenceManager.getDefaultSharedPreferences(context)
-                    ) + "/devices/config",
-                    null,
-                    Response.Listener<JSONObject> { response ->
-                        println(response)
-                        this.onSuccessfulComm()
-                        try {
-                            updateConfig(response)
-                        } catch (e: JSONException) {
-                            if (e.message == null) {
-                                this.onFailedComm("Json error while parsing config (capture)")
-                            } else {
-                                this.onFailedComm(e.message!!)
+            (when (status) {
+                Status.CAPTURING -> {
+                    this.onStatusChange(Status.CAPTURING)
+                    // Save the file
+                    // https://developer.android.com/training/data-storage/app-specific
+                    val fileName = "capture_${System.currentTimeMillis()}.jpg"
+                    val file = File(context.filesDir, fileName)
+                    file.writeBytes(data)
+                    val upload = SimpleMultiPartRequest(
+                        Request.Method.POST, Helpers.backendUrl(context, preferences) + "/capture",
+                        Response.Listener { response ->
+                            Log.i(loggerName, "REQUEST SUCCESSFUL")
+                            this.onSuccessfulComm()
+                            file.delete()
+                            println(response)
+                            try {
+                                updateConfig(JSONObject(response))
+                            } catch (e: JSONException) {
+                                if (e.message == null) {
+                                    this.onFailedComm("Json error while parsing config (capture)")
+                                } else {
+                                    this.onFailedComm(e.message!!)
+                                }
                             }
-                        }
-                    },
-                    Response.ErrorListener { error -> this.handleError(error) }
-                )
-            }
+                        },
+                        Response.ErrorListener { error ->
+                            file.delete()
+                            this.handleError(error)
+                        })
+                    upload.addFile(fileName, file.absolutePath)
+                }
+                Status.FETCHING_CONFIG -> {
+                    this.onStatusChange(Status.FETCHING_CONFIG)
+                    JsonObjectRequest(Request.Method.PUT,
+                        Helpers.backendUrl(
+                            context,
+                            PreferenceManager.getDefaultSharedPreferences(context)
+                        ) + "/devices/config",
+                        null,
+                        Response.Listener<JSONObject> { response ->
+                            println(response)
+                            this.onSuccessfulComm()
+                            try {
+                                updateConfig(response)
+                            } catch (e: JSONException) {
+                                if (e.message == null) {
+                                    this.onFailedComm("Json error while parsing config (capture)")
+                                } else {
+                                    this.onFailedComm(e.message!!)
+                                }
+                            }
+                        },
+                        Response.ErrorListener { error -> this.handleError(error) }
+                    )
+                }
+                else -> {
+                    println("Status!!")
+                    null
+                }
+            })
+                ?: return@PictureCallback
         val h = preferences.getString(
             context.getString(R.string.prefs_access_token), "NOTOKEN"
         )
@@ -209,18 +231,20 @@ class Capture(
      * Captures a single image if not capturing continuously.
      */
     fun capturePicture() {
-        if (!capturing) {
+        if (status == Status.IDLE) {
             capture()
         }
     }
 
     fun continuousCaptureOn() {
-        capturing = true
+        status = Status.CAPTURING
+        this.onStatusChange(Status.CAPTURING)
         capture()
     }
 
     fun continuousCaptureOff() {
-        capturing = false
+        status = Status.IDLE
+        this.onStatusChange(Status.IDLE)
     }
 
 
