@@ -3,6 +3,7 @@ package cz.tmscer.parksys.phone
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.AsyncTask
@@ -32,12 +33,30 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
     private var captureOn = false
     private val CAMERA_PERMISSION_REQUEST = 0
     private var capture: Capture? = null
+    private val lastSuccessfulComm = "lastSuccessfulComm"
+    private val failedComm = "failedComm"
+
+    private fun isLoggedIn(prefs: SharedPreferences): Boolean {
+        val rt = prefs.getString(
+            getString(R.string.prefs_refresh_token),
+            ""
+        )
+        val at = prefs.getString(getString(R.string.prefs_access_token), "")
+        return at!!.isNotEmpty() && rt!!.isNotEmpty()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        capture = Capture(this, prefs)
+        capture = Capture(this, prefs, onSuccessfulComm = {
+            prefs.edit().putString(lastSuccessfulComm, Date().toString()).remove(failedComm)
+                .commit()
+            updateUI()
+        }, onFailedComm = {
+            prefs.edit().putString(failedComm, "$it (${Date()})").commit()
+            updateUI()
+        })
 
         setDefaultPreferences()
         captureActivation.setOnClickListener(captureQrActivationPassword)
@@ -48,13 +67,6 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
         btnToggleCapture.setOnClickListener(toggleCapture)
         btnOneCapture.setOnClickListener { capture!!.capturePicture() }
         askConfig.setOnClickListener { capture!!.askForConfig() }
-
-        textAccessToken.text =
-            prefs.getString(getString(R.string.prefs_access_token), "<NO ACCESS TOKEN>")
-        textRefreshToken.text = prefs.getString(
-            getString(R.string.prefs_refresh_token),
-            "<NO REFRESH TOKEN>"
-        )
     }
 
     override fun onPause() {
@@ -83,15 +95,27 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
 
     override fun onResume() {
         super.onResume()
-        println(">>> OUTPUT PREFS")
-        for ((k, v) in PreferenceManager.getDefaultSharedPreferences(this).all) {
-            print(k)
-            print(", ")
-            println(v)
-        }
-
-        println("<<< OUTPUT PREFS")
+//        println(">>> OUTPUT PREFS")
+//        for ((k, v) in PreferenceManager.getDefaultSharedPreferences(this).all) {
+//            print(k)
+//            print(", ")
+//            println(v)
+//        }
+//
+//        println("<<< OUTPUT PREFS")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        updateUI()
+    }
+
+    private fun updateUI() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        textLoginStatus.text = if (this.isLoggedIn(prefs)) {
+            "YES"
+        } else {
+            "NO"
+        }
+        textLastSuccessfulExchange.text = prefs.getString(lastSuccessfulComm, "-")
+        textFailedComm.text = prefs.getString(failedComm, "-")
     }
 
     private val openSettingsActivity = View.OnClickListener {
@@ -243,9 +267,8 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
                                 this,
                                 getString(R.string.prefs_config_prefix)
                             )
-                            textAccessToken.text = accessT
-                            textRefreshToken.text = refreshT
                             commit()
+                            updateUI()
                         }
                     } else {
                         // Error

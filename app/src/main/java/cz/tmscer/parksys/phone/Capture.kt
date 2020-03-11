@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.preference.PreferenceManager
 import com.android.volley.Request
 import com.android.volley.Response
+import com.android.volley.error.VolleyError
 import com.android.volley.request.JsonObjectRequest
 import com.android.volley.request.SimpleMultiPartRequest
 import org.json.JSONException
@@ -17,7 +18,12 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 
-class Capture(private val context: Context, private val preferences: SharedPreferences) {
+class Capture(
+    private val context: Context,
+    private val preferences: SharedPreferences,
+    private val onSuccessfulComm: () -> Unit,
+    private val onFailedComm: (err: String) -> Unit
+) {
     private val loggerName = "CAPTURE"
     private var camera: Camera? = null
     private var capturing = false
@@ -91,7 +97,11 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                     try {
                         updateConfig(response)
                     } catch (e: JSONException) {
-                        // err
+                        if (e.message == null) {
+                            this.onFailedComm("Json error while parsing config (config)")
+                        } else {
+                            this.onFailedComm(e.message!!)
+                        }
                     }
                 },
                 Response.ErrorListener { error ->
@@ -99,7 +109,7 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                 }
             )
         val h = preferences.getString(
-            context.getString(R.string.prefs_access_token), "NOTOKEN"
+            context.getString(R.string.prefs_access_token), "-"
         )
         request.headers = mapOf("Authorization" to "Bearer $h")
         API.getInstance(context).addToRequestQueue(request)
@@ -111,6 +121,19 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
             Helpers.updateConfig(config, this, "shared_config_")
             commit()
         }
+    }
+
+    private fun handleError(error: VolleyError) {
+        Log.w(loggerName, "REQUEST FAILED")
+        println(error)
+        println(error.networkResponse.data)
+        val errorBody = if (error.networkResponse.data == null) {
+            "unreachable"
+        } else {
+            error.networkResponse.data.toString()
+        }
+        val errorDescription = "${error.networkResponse.statusCode}: $errorBody"
+        this.onFailedComm(errorDescription)
     }
 
     private val jpgCallback = Camera.PictureCallback { data, camera ->
@@ -134,10 +157,11 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                 val fileName = "capture_${System.currentTimeMillis()}.jpg"
                 val file = File(context.filesDir, fileName)
                 file.writeBytes(data)
-                val upload =SimpleMultiPartRequest(
+                val upload = SimpleMultiPartRequest(
                     Request.Method.POST, Helpers.backendUrl(context, preferences) + "/capture",
                     Response.Listener { response ->
                         Log.i(loggerName, "REQUEST SUCCESSFUL")
+                        this.onSuccessfulComm()
                         file.delete()
                         println(response)
                         try {
@@ -148,9 +172,7 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                     },
                     Response.ErrorListener { error ->
                         file.delete()
-                        Log.w(loggerName, "REQUEST FAILED")
-                        println(error)
-                        println(error.networkResponse.data)
+                        this.handleError(error)
                     })
                 upload.addFile(fileName, file.absolutePath)
             } else {
@@ -162,15 +184,18 @@ class Capture(private val context: Context, private val preferences: SharedPrefe
                     null,
                     Response.Listener<JSONObject> { response ->
                         println(response)
+                        this.onSuccessfulComm()
                         try {
                             updateConfig(response)
                         } catch (e: JSONException) {
-                            // err
+                            if (e.message == null) {
+                                this.onFailedComm("Json error while parsing config (capture)")
+                            } else {
+                                this.onFailedComm(e.message!!)
+                            }
                         }
                     },
-                    Response.ErrorListener { error ->
-                        println(error)
-                    }
+                    Response.ErrorListener { error -> this.handleError(error) }
                 )
             }
         val h = preferences.getString(
