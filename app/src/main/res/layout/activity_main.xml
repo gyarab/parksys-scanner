@@ -122,6 +122,12 @@
                 android:text="-"
                 android:textStyle="bold" />
         </LinearLayout>
+
+        <ImageView
+            android:id="@+id/captureView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            tools:srcCompat="@tools:sample/backgrounds/scenic" />
     </LinearLayout>
 
     <Button
@@ -142,7 +148,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
-        android:text="@string/capture_set_on"
+        android:text="Start"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/captureActivation" />
 
@@ -152,7 +158,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginTop="12dp"
-        android:text="Take 1"
+        android:text="Test Capture (no comm)"
         app:layout_constraintStart_toEndOf="@+id/btnToggleCapture"
         app:layout_constraintTop_toBottomOf="@+id/captureActivation" />
 
@@ -160,12 +166,11 @@
         android:id="@+id/askConfig"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="132dp"
-        android:text="Ask Config"
+        android:layout_marginTop="72dp"
+        android:text="Get Config"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.033"
-        app:layout_constraintStart_toEndOf="@+id/btnOneCapture"
+        app:layout_constraintHorizontal_bias="0.1"
+        app:layout_constraintStart_toEndOf="@+id/captureActivation"
         app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

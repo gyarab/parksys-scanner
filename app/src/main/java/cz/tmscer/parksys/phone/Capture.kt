@@ -19,17 +19,21 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
+import java.util.*
+import kotlin.math.max
 
 class Capture(
     private val context: Context,
     private val preferences: SharedPreferences,
     private val onSuccessfulComm: () -> Unit,
     private val onFailedComm: (err: String) -> Unit,
-    private val onStatusChange: (status: Status) -> Unit
+    private val onStatusChange: (status: Status) -> Unit,
+    private val onCapture: (data: ByteArray) -> Unit
 ) {
     private val loggerName = "CAPTURE"
     private var camera: Camera? = null
     private var status = Status.IDLE
+    private var captureStart = 0L
 
     private fun capture() {
         if (camera == null) {
@@ -46,6 +50,7 @@ class Capture(
         while (!success && i < 3) {
             i++
             try {
+                captureStart = Date().time
                 cam.setPreviewTexture(SurfaceTexture(0))
                 cam.startPreview()
                 cam.takePicture(null, null, jpgCallback)
@@ -89,7 +94,7 @@ class Capture(
                     PreferenceManager.getDefaultSharedPreferences(context)
                 ) + "/devices/config",
                 null,
-                Response.Listener<JSONObject> { response ->
+                Response.Listener { response ->
                     println(response)
                     try {
                         updateConfig(response)
@@ -148,7 +153,11 @@ class Capture(
         Log.i(loggerName, "JPG Callback")
         if (status != Status.IDLE) {
             // schedule another take
-            object : CountDownTimer(1000, 1000) {
+            val currDelay = Date().time - captureStart
+            val delay = 500L
+            val wouldBeDelay = currDelay - delay
+            val actualDelay = max(200, wouldBeDelay)
+            object : CountDownTimer(actualDelay, actualDelay) {
                 override fun onTick(millisUntilFinished: Long) {}
 
                 override fun onFinish() {
@@ -161,6 +170,7 @@ class Capture(
         val request =
             (when (status) {
                 Status.CAPTURING -> {
+                    this.onCapture(data)
                     this.onStatusChange(Status.CAPTURING)
                     // Save the file
                     // https://developer.android.com/training/data-storage/app-specific

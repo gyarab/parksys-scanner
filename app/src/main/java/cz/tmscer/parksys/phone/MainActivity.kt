@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
@@ -64,6 +65,8 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
                 status = it
                 updateUI()
             }
+        }, onCapture = {
+            captureView.setImageBitmap(BitmapFactory.decodeByteArray(it, 0, it.size))
         })
 
         setDefaultPreferences()
