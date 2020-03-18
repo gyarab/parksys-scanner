@@ -2,10 +2,11 @@ package cz.tmscer.parksys.phone
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.SurfaceTexture
 import android.hardware.Camera
 import android.os.CountDownTimer
-import android.os.Looper
 import android.util.Log
 import androidx.preference.PreferenceManager
 import com.android.volley.Request
@@ -16,6 +17,7 @@ import com.android.volley.request.SimpleMultiPartRequest
 import cz.tmscer.parksys.phone.models.Status
 import org.json.JSONException
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
@@ -28,7 +30,7 @@ class Capture(
     private val onSuccessfulComm: () -> Unit,
     private val onFailedComm: (err: String) -> Unit,
     private val onStatusChange: (status: Status) -> Unit,
-    private val onCapture: (data: ByteArray) -> Unit
+    private val onCapture: (data: Bitmap) -> Unit
 ) {
     private val loggerName = "CAPTURE"
     private var camera: Camera? = null
@@ -157,6 +159,8 @@ class Capture(
             val delay = 500L
             val wouldBeDelay = currDelay - delay
             val actualDelay = max(200, wouldBeDelay)
+            println(wouldBeDelay)
+            println(actualDelay)
             object : CountDownTimer(actualDelay, actualDelay) {
                 override fun onTick(millisUntilFinished: Long) {}
 
@@ -164,19 +168,35 @@ class Capture(
                     capture()
                 }
             }.start()
+        } else if (status === Status.IDLE) {
+            // It is a test
+            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+            this.onCapture(bitmap)
+            return@PictureCallback
         }
         // Upload
         // https://github.com/DWorkS/VolleyPlus
         val request =
             (when (status) {
                 Status.CAPTURING -> {
-                    this.onCapture(data)
+                    val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+                    this.onCapture(bitmap)
                     this.onStatusChange(Status.CAPTURING)
-                    // Save the file
-                    // https://developer.android.com/training/data-storage/app-specific
                     val fileName = "capture_${System.currentTimeMillis()}.jpg"
                     val file = File(context.filesDir, fileName)
-                    file.writeBytes(data)
+
+
+                    val output = ByteArrayOutputStream()
+                    val resizeX =
+                        preferences.getString("shared_config_resizeX", "1000")?.toInt() ?: 1000
+                    val resizeY =
+                        preferences.getString("shared_config_resizeY", "1000")?.toInt() ?: 1000
+                    // https://stackoverflow.com/questions/10413659/how-to-resize-image-in-android
+                    Bitmap.createScaledBitmap(bitmap, resizeX, resizeY, true)
+                        .compress(Bitmap.CompressFormat.JPEG, 100, output)
+                    // Save the file
+                    // https://developer.android.com/training/data-storage/app-specific
+                    file.writeBytes(output.toByteArray())
                     val upload = SimpleMultiPartRequest(
                         Request.Method.POST, Helpers.backendUrl(context, preferences) + "/capture",
                         Response.Listener { response ->

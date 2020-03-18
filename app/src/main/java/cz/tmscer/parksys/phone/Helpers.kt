@@ -26,7 +26,10 @@ object Helpers {
         for (confKey in config.keys()) {
             val value = config.getString(confKey)
             // Prefix the config key
-            prefs.putString(String.format("%s%s", prefix, confKey), value)
+            val key = String.format("%s%s", prefix, confKey)
+            println(confKey)
+            println(key)
+            prefs.putString(key, value)
         }
     }
 }

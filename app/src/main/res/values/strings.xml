@@ -21,4 +21,6 @@
     <string name="prefs_config_prefix">shared_config_</string>
     <string name="shared_config_type">Device Type (IN/OUT)</string>
     <string name="shared_config_capturing">Capturing (true/false)</string>
+    <string name="shared_config_resizeX">Resize X</string>
+    <string name="shared_config_resizeY">Resize Y</string>
 </resources>

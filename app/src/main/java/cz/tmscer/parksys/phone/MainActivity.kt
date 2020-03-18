@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity(), AsyncResponse<ActivationPassword?> {
                 updateUI()
             }
         }, onCapture = {
-            captureView.setImageBitmap(BitmapFactory.decodeByteArray(it, 0, it.size))
+            captureView.setImageBitmap(it)
         })
 
         setDefaultPreferences()

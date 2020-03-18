@@ -52,6 +52,16 @@
             android:key="shared_config_capturing"
             android:title="@string/shared_config_capturing"
             app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="shared_config_resizeX"
+            android:title="@string/shared_config_resizeX"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="shared_config_resizeY"
+            android:title="@string/shared_config_resizeY"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>
