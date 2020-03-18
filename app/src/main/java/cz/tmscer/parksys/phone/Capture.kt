@@ -188,7 +188,7 @@ class Capture(
 
                     val output = ByteArrayOutputStream()
                     val resizeX =
-                        preferences.getString("shared_config_resizeX", "1000")?.toInt() ?: 1000
+                        preferences.getString("shared_config_resizeX", "1300")?.toInt() ?: 1300
                     val resizeY =
                         preferences.getString("shared_config_resizeY", "1000")?.toInt() ?: 1000
                     // https://stackoverflow.com/questions/10413659/how-to-resize-image-in-android
